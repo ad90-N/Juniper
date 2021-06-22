@@ -1,0 +1,57 @@
+---
+- name: Install Junos OS
+  hosts: lab
+  connection: local
+  gather_facts: no
+  roles:
+   - Juniper.junos
+  vars_prompt:
+   - name: username
+     prompt: Junos Username
+     private: no
+
+   - name: password
+     prompt: Junos Password
+     private: Yes
+  
+  vars:
+    OS_version: "20.2R2-S3.5"
+    OS_package: "jinstall-host-qfx-5-20.2R2-S3.5-signed.tgz"
+    pkg_dir: "/home/labroot/"
+    log_dir: "{{ playbook_dir }}"
+    netconf_port: 830
+    wait_time: 3600
+
+  tasks:
+    - name: Checking NETCONF connectivity
+      wait_for: 
+        host: "{{ inventory_hostname }}" 
+        port: "{{ netconf_port }}"
+        timeout: 5
+
+    - name: Install Junos OS package
+      juniper_junos_software:
+        user: "{{ username }}"
+        passwd: "{{ password }}"
+        version: "{{ OS_version }}"
+        local_package: "{{ pkg_dir }}/{{ OS_package }}"
+        no_copy: False
+        force_host: True
+        reboot: True
+        validate: True
+        logfile: "{{ log_dir }}/software.log"
+      register: response
+      notify:
+      - wait_reboot
+
+    - name: Print response
+      debug:
+        var: response
+
+  handlers:
+    - name: wait_reboot
+      wait_for: 
+        host: "{{ inventory_hostname }}"
+        port: "{{ netconf_port }}"
+        timeout: "{{ wait_time }}"
+      when: not response.check_mode
